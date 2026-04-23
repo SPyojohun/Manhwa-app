@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#ffd6e1" />
+<title>만화 — Manhwa Library</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/png" href="icons/favicon.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Prompt:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- Decorative korean characters around screen -->
+<div class="deco-layer" aria-hidden="true">
+  <span class="deco" style="top:4%; left:4%;">만화</span>
+  <span class="deco" style="top:10%; right:6%;">사랑</span>
+  <span class="deco" style="top:30%; left:-2%;">ㅋ</span>
+  <span class="deco" style="top:55%; right:-1%;">웹툰</span>
+  <span class="deco" style="bottom:18%; left:5%;">소녀</span>
+  <span class="deco" style="bottom:25%; right:8%;">ㅎㅎ</span>
+  <span class="deco" style="top:75%; left:50%;">♥</span>
+</div>
+
+<!-- Top decorative banner (no header bar as requested) -->
+<div class="top-deco" aria-hidden="true">
+  <svg viewBox="0 0 400 80" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="topg" x1="0" x2="1">
+        <stop offset="0" stop-color="#ffd6e1"/>
+        <stop offset="0.5" stop-color="#ffe6ec"/>
+        <stop offset="1" stop-color="#ffd6e1"/>
+      </linearGradient>
+    </defs>
+    <path d="M0 60 Q100 0 200 40 T400 30 L400 0 L0 0 Z" fill="url(#topg)"/>
+    <circle cx="60" cy="50" r="4" fill="#ffb6c8" opacity="0.7"/>
+    <circle cx="160" cy="65" r="3" fill="#ff9bb4" opacity="0.6"/>
+    <circle cx="280" cy="45" r="5" fill="#ffb6c8" opacity="0.7"/>
+    <circle cx="350" cy="60" r="3" fill="#ff9bb4" opacity="0.6"/>
+  </svg>
+  <div class="top-title">
+    <span class="kr">만화</span>
+    <span class="th">คลังมังฮวาของฉัน</span>
+  </div>
+</div>
+
+<main id="app">
+
+  <!-- ============ PAGE: Manhwa ============ -->
+  <section class="page" data-page="manhwa">
+    <div class="page-header">
+      <h2><span class="kr-mini">만화</span> มังฮวาทั้งหมด</h2>
+      <span class="count" id="manhwaCount">0 เรื่อง</span>
+    </div>
+    <div class="grid" id="manhwaGrid"></div>
+    <div class="empty" id="manhwaEmpty">
+      <div class="empty-kr">텅 비었어요</div>
+      <p>ยังไม่มีมังฮวา กดปุ่ม <b>อื่นๆ → เพิ่ม</b> เพื่อเริ่มเก็บ</p>
+    </div>
+  </section>
+
+  <!-- ============ PAGE: Collections ============ -->
+  <section class="page" data-page="collections" hidden>
+    <div class="page-header">
+      <h2><span class="kr-mini">컬렉션</span> คอลเล็กชั่น</h2>
+      <button class="btn-primary" id="btnAddCollection">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        เพิ่ม
+      </button>
+    </div>
+    <div class="grid" id="collectionsGrid"></div>
+    <div class="empty" id="collectionsEmpty">
+      <div class="empty-kr">컬렉션 없음</div>
+      <p>ยังไม่มีคอลเล็กชั่น กดปุ่ม <b>เพิ่ม</b> ด้านบน</p>
+    </div>
+  </section>
+
+  <!-- ============ PAGE: Search ============ -->
+  <section class="page" data-page="search" hidden>
+    <div class="page-header">
+      <h2><span class="kr-mini">검색</span> ค้นหา</h2>
+    </div>
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" class="ic"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="searchInput" type="text" placeholder="พิมพ์ชื่อมังฮวา / คอลเล็กชั่น / นางเอก..." />
+    </div>
+    <div class="search-results" id="searchResults">
+      <p class="hint">เริ่มพิมพ์เพื่อค้นหา</p>
+    </div>
+  </section>
+
+  <!-- ============ PAGE: Heroines ============ -->
+  <section class="page" data-page="heroine" hidden>
+    <div class="page-header">
+      <h2><span class="kr-mini">여주인공</span> นางเอกในดวงใจ</h2>
+      <button class="btn-primary" id="btnAddHeroine">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        เพิ่ม
+      </button>
+    </div>
+    <div class="grid" id="heroineGrid"></div>
+    <div class="empty" id="heroineEmpty">
+      <div class="empty-kr">아직 없어요</div>
+      <p>ยังไม่มีนางเอก กดปุ่ม <b>เพิ่ม</b> เพื่อเพิ่ม</p>
+    </div>
+  </section>
+
+  <!-- ============ PAGE: More ============ -->
+  <section class="page" data-page="more" hidden>
+    <div class="page-header">
+      <h2><span class="kr-mini">더보기</span> เมนูอื่นๆ</h2>
+    </div>
+    <div class="more-list">
+      <button class="more-item" data-action="install" id="installItem" hidden>
+        <span class="more-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg></span>
+        <div><b>ติดตั้งเป็นแอป</b><small>เพิ่มลงหน้าจอหลักของเครื่อง (PWA)</small></div>
+      </button>
+      <button class="more-item" data-action="add">
+        <span class="more-ic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg></span>
+        <div><b>เพิ่มมังฮวา</b><small>เพิ่ม URL ชื่อ คำอธิบาย และรูป</small></div>
+      </button>
+      <button class="more-item" data-action="manage">
+        <span class="more-ic"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg></span>
+        <div><b>จัดการข้อมูล</b><small>แก้ไข / ลบมังฮวาที่เก็บไว้</small></div>
+      </button>
+      <button class="more-item" data-action="history">
+        <span class="more-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg></span>
+        <div><b>ประวัติการดู</b><small>เรื่องที่กดเปิดล่าสุด</small></div>
+      </button>
+      <button class="more-item" data-action="export">
+        <span class="more-ic"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg></span>
+        <div><b>สำรองข้อมูล (Export JSON)</b><small>ดาวน์โหลดไฟล์ backup</small></div>
+      </button>
+      <button class="more-item" data-action="import">
+        <span class="more-ic"><svg viewBox="0 0 24 24"><path d="M12 21V9m0 0l-4 4m4-4l4 4M4 5h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg></span>
+        <div><b>กู้คืนข้อมูล (Import JSON)</b><small>โหลดไฟล์ backup กลับมา</small></div>
+      </button>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ Bottom Nav ============ -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-target="manhwa">
+    <svg viewBox="0 0 24 24"><path d="M4 4h7v16H4zM13 4h7v16h-7z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/></svg>
+    <span>มังฮวา</span>
+  </button>
+  <button class="nav-btn" data-target="collections">
+    <svg viewBox="0 0 24 24"><path d="M4 7h16M6 12h12M8 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    <span>คอลเล็กชั่น</span>
+  </button>
+  <button class="nav-btn" data-target="search">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <span>ค้นหา</span>
+  </button>
+  <button class="nav-btn" data-target="heroine">
+    <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M4 21c0-4 4-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+    <span>นางเอก</span>
+  </button>
+  <button class="nav-btn" data-target="more">
+    <svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18" cy="12" r="1.6" fill="currentColor"/></svg>
+    <span>อื่นๆ</span>
+  </button>
+</nav>
+
+<!-- ============ Modal ============ -->
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle">หัวข้อ</h3>
+      <button class="modal-close" id="modalClose" aria-label="ปิด">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- ============ Toast ============ -->
+<div class="toast" id="toast" hidden></div>
+
+<!-- file input for import -->
+<input type="file" id="importFile" accept="application/json" hidden />
+
+<script src="script.js"></script>
+</body>
+</html>
