@@ -3,6 +3,7 @@
    - IndexedDB persistence (resists cache clearing)
    - JSON Export/Import for backup
    - PWA installable
+   - Share system (serverless: items are packed into the link)
 =========================================================== */
 
 /* -------------------- Audio (click sound) -------------------- */
@@ -95,6 +96,7 @@ function toast(msg){
 
 /* -------------------- Page nav -------------------- */
 function showPage(name){
+  if(name!=='manhwa' && selectMode) setSelectMode(false);
   $$('.page').forEach(p => p.hidden = p.dataset.page !== name);
   $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.target===name));
   Sound.click();
@@ -168,10 +170,15 @@ function escapeHTML(s){
 }
 
 /* -------------------- Manhwa page -------------------- */
+const CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+
 function renderManhwa(){
   const grid = $('#manhwaGrid');
   $('#manhwaCount').textContent = state.manhwa.length + ' เรื่อง';
+  $('#btnSelectMode').hidden = state.manhwa.length===0 || selectMode;
   if(state.manhwa.length===0){
+    if(selectMode){ selectMode=false; selectedIds.clear(); document.body.classList.remove('selecting'); $('#selectBar').hidden=true; }
+    grid.classList.remove('selecting');
     grid.innerHTML = '';
     $('#manhwaEmpty').classList.add('show');
     return;
@@ -187,6 +194,18 @@ function renderManhwa(){
   grid.querySelectorAll('[data-action="edit"]').forEach(b=>{
     b.addEventListener('click', e=>{ openManhwaForm(b.dataset.id); });
   });
+
+  // selection mode decorations
+  grid.classList.toggle('selecting', selectMode);
+  if(selectMode){
+    // drop ids that no longer exist
+    for(const id of [...selectedIds]) if(!state.manhwa.some(m=>m.id===id)) selectedIds.delete(id);
+    grid.querySelectorAll('.card').forEach(card=>{
+      card.querySelector('.card-img').insertAdjacentHTML('beforeend', `<span class="sel-mark">${CHECK_SVG}</span>`);
+      card.classList.toggle('selected', selectedIds.has(card.dataset.id));
+    });
+    updateSelectBar();
+  }
 }
 
 function openManhwa(id){
@@ -495,6 +514,7 @@ document.querySelectorAll('.more-item').forEach(it=>{
     else if(a==='history') openHistoryModal();
     else if(a==='export') exportData();
     else if(a==='import') $('#importFile').click();
+    else if(a==='receive') openReceiveModal();
     else if(a==='install') triggerInstall();
   });
 });
@@ -556,14 +576,20 @@ function openHistoryModal(){
 }
 
 /* -------------------- Modal core -------------------- */
+let onModalClose = null; // optional callback fired when the modal is dismissed
 function openModal(title, bodyHTML){
+  onModalClose = null;
   $('#modalTitle').textContent = title;
   $('#modalBody').innerHTML = bodyHTML;
   $('#modal').hidden = false;
   // bind close buttons (data-close)
   $$('#modalBody [data-close]').forEach(b=> b.addEventListener('click', closeModal));
 }
-function closeModal(){ $('#modal').hidden = true; }
+function closeModal(){
+  $('#modal').hidden = true;
+  const f = onModalClose; onModalClose = null;
+  if(f) f();
+}
 $('#modalClose').addEventListener('click', closeModal);
 $('#modal').addEventListener('click', e=>{ if(e.target.id==='modal') closeModal(); });
 
@@ -622,6 +648,375 @@ $('#importFile').addEventListener('change', async e=>{
   }
   e.target.value='';
 });
+
+/* ===========================================================
+   SHARE SYSTEM
+   No server: the selected items are serialised -> deflate -> base64url
+   and placed in the URL hash:  https://your-app/#share=<code>
+   The hash never leaves the browser, so nothing is uploaded anywhere.
+=========================================================== */
+
+/* ---------- encoding helpers ---------- */
+function b64uEnc(bytes){
+  let bin = '';
+  for(let i=0;i<bytes.length;i+=0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i,i+0x8000));
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64uDec(str){
+  str = str.replace(/-/g,'+').replace(/_/g,'/');
+  while(str.length % 4) str += '=';
+  const bin = atob(str);
+  const out = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function pipeBytes(bytes, transform, cap=Infinity){
+  const reader = new Blob([bytes]).stream().pipeThrough(transform).getReader();
+  const chunks = []; let total = 0;
+  for(;;){
+    const {done, value} = await reader.read();
+    if(done) break;
+    total += value.length;
+    if(total > cap){ reader.cancel(); throw new Error('too-big'); }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total); let o = 0;
+  for(const c of chunks){ out.set(c,o); o += c.length; }
+  return out;
+}
+const MAX_DECODED_BYTES = 4 * 1024 * 1024;   // zip-bomb guard
+const MAX_ITEMS = 100;
+
+async function encodeShare(obj){
+  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  if(typeof CompressionStream === 'function'){
+    try{ return 'z' + b64uEnc(await pipeBytes(bytes, new CompressionStream('deflate-raw'))); }catch(_){}
+  }
+  return 'p' + b64uEnc(bytes);                // uncompressed fallback
+}
+async function decodeShare(code){
+  const kind = code[0], bytes = b64uDec(code.slice(1));
+  let out;
+  if(kind === 'z'){
+    if(typeof DecompressionStream !== 'function') throw new Error('no-decompress');
+    out = await pipeBytes(bytes, new DecompressionStream('deflate-raw'), MAX_DECODED_BYTES);
+  } else if(kind === 'p'){
+    if(bytes.length > MAX_DECODED_BYTES) throw new Error('too-big');
+    out = bytes;
+  } else throw new Error('bad-kind');
+  return JSON.parse(new TextDecoder().decode(out));
+}
+
+/* ---------- incoming data validation (never trust a link) ---------- */
+function safeHttpUrl(u){
+  try{
+    const p = new URL(String(u||'').trim());
+    return (p.protocol==='http:' || p.protocol==='https:') ? p.href : '';
+  }catch(_){ return ''; }
+}
+const normKey = u => (safeHttpUrl(u) || String(u||'').trim()).replace(/\/+$/,'').toLowerCase();
+
+function sanitizeIncoming(payload){
+  if(!payload || payload.v !== 1 || !Array.isArray(payload.items)) throw new Error('bad-payload');
+  return payload.items.slice(0, MAX_ITEMS).map(x=>{
+    if(!x || typeof x !== 'object') return null;
+    const url = safeHttpUrl(x.u);                       // only http(s) links
+    const title = String(x.t||'').trim().slice(0,200);
+    if(!url || !title) return null;
+    const desc = String(x.d||'').trim().slice(0,1000);
+    const b64 = typeof x.i === 'string' ? x.i : '';
+    const img = (b64 && b64.length < 150000 && /^[A-Za-z0-9+/=]+$/.test(b64))
+      ? 'data:image/jpeg;base64,' + b64 : '';
+    return {title, url, desc, img};
+  }).filter(Boolean);
+}
+
+/* find a share code inside a full URL, "#share=..." or a bare code */
+function extractShareCode(text){
+  const t = String(text||'').trim();
+  if(!t) return '';
+  const m = t.match(/share=([A-Za-z0-9_-]+)/);
+  if(m) return m[1];
+  const bare = t.replace(/\s+/g,'');
+  return /^[zp][A-Za-z0-9_-]{8,}$/.test(bare) ? bare : '';
+}
+function clearShareHash(){
+  if(/share=/.test(location.hash)){
+    try{ history.replaceState(null, '', location.pathname + location.search); }catch(_){ location.hash=''; }
+  }
+}
+
+/* ---------- selection mode ---------- */
+let selectMode = false;
+const selectedIds = new Set();
+
+function setSelectMode(on){
+  selectMode = on;
+  selectedIds.clear();
+  document.body.classList.toggle('selecting', on);
+  $('#selectBar').hidden = !on;
+  renderManhwa();
+  if(on) updateSelectBar();
+}
+function updateSelectBar(){
+  const n = selectedIds.size;
+  $('#selCount').textContent = 'เลือก ' + n;
+  $('#selShare').disabled = n === 0;
+  $('#selAll').textContent = (n === state.manhwa.length && n > 0) ? 'ล้าง' : 'ทั้งหมด';
+}
+$('#btnSelectMode').addEventListener('click', ()=>{ Sound.click(); setSelectMode(true); });
+$('#selCancel').addEventListener('click', ()=>{ Sound.click(); setSelectMode(false); });
+$('#selAll').addEventListener('click', ()=>{
+  Sound.click();
+  if(selectedIds.size === state.manhwa.length) selectedIds.clear();
+  else state.manhwa.forEach(m=> selectedIds.add(m.id));
+  $$('#manhwaGrid .card').forEach(c=> c.classList.toggle('selected', selectedIds.has(c.dataset.id)));
+  updateSelectBar();
+});
+$('#manhwaGrid').addEventListener('click', e=>{
+  if(!selectMode) return;
+  const card = e.target.closest('.card'); if(!card) return;
+  const id = card.dataset.id;
+  if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+  card.classList.toggle('selected', selectedIds.has(id));
+  Sound.click();
+  updateSelectBar();
+});
+$('#selShare').addEventListener('click', ()=>{
+  if(selectedIds.size) openShareModal();
+});
+
+/* ---------- thumbnails (keep the link short) ---------- */
+const thumbCache = new Map();
+function makeThumb(dataURL, maxW=90, quality=0.5){
+  if(thumbCache.has(dataURL)) return Promise.resolve(thumbCache.get(dataURL));
+  return new Promise(res=>{
+    const img = new Image();
+    img.onload = ()=>{
+      try{
+        const scale = Math.min(1, maxW / img.width);
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width*scale));
+        c.height = Math.max(1, Math.round(img.height*scale));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        const out = c.toDataURL('image/jpeg', quality).split(',')[1] || '';
+        thumbCache.set(dataURL, out); res(out);
+      }catch(_){ res(''); }
+    };
+    img.onerror = ()=> res('');
+    img.src = dataURL;
+  });
+}
+
+async function buildShareURL(items, withImg){
+  const payload = {v:1, items:[]};
+  for(const m of items){
+    const o = {t:m.title, u:m.url};
+    if(m.desc) o.d = m.desc;
+    if(withImg && m.img){ const t = await makeThumb(m.img); if(t) o.i = t; }
+    payload.items.push(o);
+  }
+  const base = location.href.split('#')[0];
+  return base + '#share=' + await encodeShare(payload);
+}
+
+/* ---------- share modal ---------- */
+function copyText(text, inputEl){
+  if(navigator.clipboard && window.isSecureContext){
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((res, rej)=>{
+    try{
+      inputEl.focus(); inputEl.select();
+      document.execCommand('copy') ? res() : rej();
+    }catch(e){ rej(e); }
+  });
+}
+
+async function openShareModal(){
+  const items = state.manhwa
+    .filter(m => selectedIds.has(m.id))
+    .sort((a,b)=> b.createdAt - a.createdAt);
+  if(!items.length) return;
+  const hasAnyImg = items.some(m=> m.img);
+  const isLocal = location.protocol==='file:' || /^(localhost|127\.|192\.168\.|10\.|\[?::1)/.test(location.hostname);
+  const canNativeShare = typeof navigator.share === 'function';
+
+  openModal('แชร์มังฮวา', `
+    <div class="share-sum">กำลังแชร์ <b>${items.length}</b> เรื่อง — คนที่เปิดลิงก์จะเห็นตัวอย่างก่อน แล้วเลือกรับหรือปฏิเสธได้</div>
+    ${hasAnyImg ? `
+    <label class="toggle-row">
+      <input type="checkbox" id="s_img" checked>
+      <span>แนบรูปปก (ย่อขนาด)<small>ลิงก์จะยาวขึ้น ถ้าส่งผ่านแชตแล้วลิงก์ขาด ให้ปิดตัวเลือกนี้</small></span>
+    </label>` : ''}
+    <div class="field">
+      <label>ลิงก์แชร์</label>
+      <input type="text" class="share-url" id="s_url" readonly value="กำลังสร้างลิงก์...">
+      <div class="share-meta" id="s_meta"></div>
+    </div>
+    ${isLocal ? `<div class="share-note">ตอนนี้เปิดแอปจากที่อยู่ในเครื่อง (${escapeHTML(location.hostname||'file')}) — คนอื่นจะเปิดลิงก์นี้ไม่ได้จนกว่าจะ deploy แอปขึ้นเว็บ (Netlify / GitHub Pages ฯลฯ)</div>` : ''}
+    <div class="modal-actions">
+      ${canNativeShare ? '<button class="btn-ghost" id="s_native" disabled>แชร์ผ่านแอป</button>' : ''}
+      <button class="btn-primary" id="s_copy" disabled>คัดลอกลิงก์</button>
+    </div>
+  `);
+
+  let token = 0, currentURL = '';
+  const urlInput = $('#s_url'), meta = $('#s_meta');
+  const copyBtn = $('#s_copy'), nativeBtn = $('#s_native');
+
+  async function build(){
+    const my = ++token;
+    copyBtn.disabled = true; if(nativeBtn) nativeBtn.disabled = true;
+    urlInput.value = 'กำลังสร้างลิงก์...';
+    const withImg = hasAnyImg ? $('#s_img').checked : false;
+    let url;
+    try{ url = await buildShareURL(items, withImg); }
+    catch(_){ if(my===token){ urlInput.value=''; meta.textContent='สร้างลิงก์ไม่สำเร็จ'; meta.className='share-meta warn'; } return; }
+    if(my !== token) return;              // a newer build superseded this one
+    currentURL = url;
+    urlInput.value = url;
+    const len = url.length;
+    meta.textContent = `ความยาวลิงก์ ${len.toLocaleString()} ตัวอักษร`;
+    meta.className = 'share-meta';
+    if(len > 8000){
+      meta.textContent += ' — ยาวมาก บางแอปแชทอาจตัดลิงก์ ลองปิดรูปปกหรือแชร์ทีละน้อยลง';
+      meta.className = 'share-meta warn';
+    }
+    copyBtn.disabled = false; if(nativeBtn) nativeBtn.disabled = false;
+  }
+  if(hasAnyImg) $('#s_img').addEventListener('change', build);
+  urlInput.addEventListener('focus', ()=> urlInput.select());
+
+  copyBtn.addEventListener('click', async ()=>{
+    try{ await copyText(currentURL, urlInput); toast('คัดลอกลิงก์แล้ว'); Sound.pop(); }
+    catch(_){ urlInput.select(); toast('กดค้างที่ช่องลิงก์เพื่อคัดลอก'); }
+  });
+  if(nativeBtn) nativeBtn.addEventListener('click', async ()=>{
+    try{ await navigator.share({title:'만화 — Manhwa Library', text:`แชร์มังฮวา ${items.length} เรื่อง`, url: currentURL}); }
+    catch(_){ /* user cancelled */ }
+  });
+  build();
+}
+
+/* ---------- receive: preview + accept / deny ---------- */
+function hostOf(u){ try{ return new URL(u).hostname.replace(/^www\./,''); }catch(_){ return u; } }
+
+async function showReceive(code, fromHash){
+  let items;
+  try{
+    items = sanitizeIncoming(await decodeShare(code));
+  }catch(err){
+    const old = err && err.message === 'no-decompress';
+    toast(old ? 'เบราว์เซอร์นี้เก่าเกินไปสำหรับลิงก์นี้' : 'ลิงก์แชร์ไม่ถูกต้องหรือไม่สมบูรณ์');
+    Sound.warn();
+    if(fromHash) clearShareHash();
+    return false;
+  }
+  if(!items.length){
+    toast('ลิงก์นี้ไม่มีรายการที่ใช้ได้');
+    if(fromHash) clearShareHash();
+    return false;
+  }
+  const have = new Set(state.manhwa.map(m=> normKey(m.url)));
+  const seen = new Set();
+  items.forEach(it=>{
+    const k = normKey(it.url);
+    it.dup = have.has(k) || seen.has(k);   // already in library (or repeated inside the link)
+    seen.add(k);
+  });
+  const newCount = items.filter(i=>!i.dup).length;
+
+  const rows = items.map((it,i)=>`
+    <label class="manage-row recv-row ${it.dup?'off':''}">
+      <input type="checkbox" data-i="${i}" ${it.dup?'':'checked'}>
+      <div class="thumb">${it.img?`<img src="${it.img}" alt="">`:'만'}</div>
+      <div class="info">
+        <b>${escapeHTML(it.title)}</b>
+        <small class="host">${escapeHTML(hostOf(it.url))}</small>
+        ${it.desc?`<div class="rdesc">${escapeHTML(it.desc)}</div>`:''}
+      </div>
+      ${it.dup?'<span class="badge-dup">มีอยู่แล้ว</span>':''}
+    </label>`).join('');
+
+  openModal('มีคนแชร์มังฮวามาให้คุณ', `
+    <div class="recv-intro">ได้รับ <b>${items.length}</b> เรื่อง — ติ๊กเลือกเรื่องที่ต้องการเก็บ แล้วกด <b>ยอมรับ</b></div>
+    <div class="recv-bar"><span id="rv_count"></span><button id="rv_all"></button></div>
+    <div class="recv-list">${rows}</div>
+    <div class="recv-hint">ตัวอย่างนี้ยังไม่ถูกบันทึก — จะเพิ่มเข้าคลังเมื่อกด “ยอมรับ” เท่านั้น ตรวจสอบโดเมนของลิงก์ก่อนเปิดเสมอ</div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="rv_deny">ปฏิเสธ</button>
+      <button class="btn-primary" id="rv_accept">ยอมรับ</button>
+    </div>
+  `);
+  onModalClose = ()=> clearShareHash();   // closing the preview = not accepted; don't re-show on reload
+
+  const boxes = [...$$('#modalBody .recv-row input')];
+  function refresh(){
+    const n = boxes.filter(b=>b.checked).length;
+    $('#rv_count').textContent = `เลือกแล้ว ${n} / ${items.length}`;
+    $('#rv_accept').textContent = n ? `ยอมรับ (${n})` : 'ยอมรับ';
+    $('#rv_accept').disabled = n === 0;
+    $('#rv_all').textContent = n === items.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด';
+    boxes.forEach(b=> b.closest('.recv-row').classList.toggle('off', !b.checked));
+  }
+  boxes.forEach(b=> b.addEventListener('change', refresh));
+  $('#rv_all').addEventListener('click', ()=>{
+    const all = boxes.every(b=>b.checked);
+    boxes.forEach(b=> b.checked = !all);
+    refresh();
+  });
+  refresh();
+
+  $('#rv_deny').addEventListener('click', ()=>{
+    closeModal();                          // hook clears the hash
+    toast('ปฏิเสธแล้ว'); Sound.soft();
+  });
+  $('#rv_accept').addEventListener('click', ()=>{
+    const picked = boxes.filter(b=>b.checked).map(b=> items[+b.dataset.i]);
+    if(!picked.length) return;
+    const now = Date.now();
+    picked.forEach((it,idx)=>{
+      // keep the shared order: earlier in the list = newer createdAt
+      state.manhwa.push({id:uid(), title:it.title, url:it.url, desc:it.desc, img:it.img, createdAt: now + (picked.length-idx)});
+    });
+    saveState();
+    closeModal();
+    if(selectMode) setSelectMode(false);
+    showPage('manhwa');
+    toast(`เพิ่ม ${picked.length} เรื่องเข้าคลังแล้ว`); Sound.pop();
+  });
+  return true;
+}
+
+/* ---------- "Receive from URL" (More menu) ---------- */
+function openReceiveModal(){
+  const canPaste = !!(navigator.clipboard && navigator.clipboard.readText);
+  openModal('รับจาก URL', `
+    <div class="field">
+      <label>วางลิงก์แชร์ที่ได้รับ</label>
+      <textarea id="r_in" placeholder="https://.../#share=..." spellcheck="false" autocomplete="off"></textarea>
+    </div>
+    <div class="recv-hint" style="margin-top:-6px;margin-bottom:6px;">จะแสดงตัวอย่างให้ดูก่อน ยังไม่เพิ่มอะไรเข้าคลังจนกว่าจะกดยอมรับ</div>
+    <div class="modal-actions">
+      ${canPaste ? '<button class="btn-ghost" id="r_paste">วางจากคลิปบอร์ด</button>' : ''}
+      <button class="btn-primary" id="r_go">ดูตัวอย่าง</button>
+    </div>
+  `);
+  const input = $('#r_in');
+  const go = async ()=>{
+    const code = extractShareCode(input.value);
+    if(!code){ toast('ไม่พบลิงก์แชร์ในข้อความนี้'); Sound.warn(); return; }
+    await showReceive(code, false);
+  };
+  $('#r_go').addEventListener('click', go);
+  input.addEventListener('paste', ()=> setTimeout(()=>{ if(extractShareCode(input.value)) go(); }, 0));
+  if(canPaste) $('#r_paste').addEventListener('click', async ()=>{
+    try{ input.value = await navigator.clipboard.readText(); go(); }
+    catch(_){ toast('อ่านคลิปบอร์ดไม่ได้ กรุณากดวางเอง'); }
+  });
+  setTimeout(()=> input.focus(), 50);
+}
 
 /* -------------------- PWA service worker -------------------- */
 if('serviceWorker' in navigator){
@@ -696,4 +1091,11 @@ if(isStandalone()) showInstallItem(false);
 (async function init(){
   await loadState();
   renderManhwa();
+  // opened via a share link?
+  const code = extractShareCode(location.hash);
+  if(code) showReceive(code, true);
 })();
+window.addEventListener('hashchange', ()=>{
+  const code = extractShareCode(location.hash);
+  if(code) showReceive(code, true);
+});
