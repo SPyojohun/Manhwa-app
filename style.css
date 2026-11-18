@@ -515,3 +515,16 @@ body.selecting .toast{bottom:calc(var(--nav-h) + 84px);}
   .head-right .count{padding:5px 9px;font-size:12px;white-space:nowrap;}
   .btn-select{padding:6px 10px;font-size:12.5px;white-space:nowrap;}
 }
+
+.btn-danger-icon{
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  background:#ffe1e8;color:#d94d75;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+.btn-danger-icon svg{width:18px;height:18px;}
+.btn-danger-icon:disabled{opacity:.45;cursor:not-allowed;}
+.btn-danger-icon:not(:disabled):active{background:#ffc9d6;}
+@media(max-width:420px){
+  .select-bar .inner{gap:6px;padding-left:12px;}
+  .select-bar .btn-ghost.sm,.select-bar .btn-primary.sm{padding:8px 10px;}
+}

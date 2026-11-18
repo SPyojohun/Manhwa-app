@@ -762,6 +762,7 @@ function updateSelectBar(){
   const n = selectedIds.size;
   $('#selCount').textContent = 'เลือก ' + n;
   $('#selShare').disabled = n === 0;
+  $('#selDelete').disabled = n === 0;
   $('#selAll').textContent = (n === state.manhwa.length && n > 0) ? 'ล้าง' : 'ทั้งหมด';
 }
 $('#btnSelectMode').addEventListener('click', ()=>{ Sound.click(); setSelectMode(true); });
@@ -784,6 +785,18 @@ $('#manhwaGrid').addEventListener('click', e=>{
 });
 $('#selShare').addEventListener('click', ()=>{
   if(selectedIds.size) openShareModal();
+});
+$('#selDelete').addEventListener('click', ()=>{
+  const ids = new Set(selectedIds);
+  if(!ids.size) return;
+  confirmDelete(`มังฮวาที่เลือก ${ids.size} เรื่อง`, ()=>{
+    state.manhwa = state.manhwa.filter(m=> !ids.has(m.id));
+    state.collections.forEach(c => c.items = c.items.filter(i=> !ids.has(i)));  // keep collections consistent
+    selectedIds.clear();
+    saveState();
+    renderManhwa();          // stays in select mode (resets itself if the library is now empty)
+    toast(`ลบแล้ว ${ids.size} เรื่อง`);
+  });
 });
 
 /* ---------- thumbnails (keep the link short) ---------- */
