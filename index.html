@@ -54,8 +54,21 @@
   <section class="page" data-page="manhwa">
     <div class="page-header">
       <h2><span class="kr-mini">만화</span> มังฮวาทั้งหมด</h2>
-      <span class="count" id="manhwaCount">0 เรื่อง</span>
+      <div class="head-right">
+        <button class="btn-ghost btn-select" id="btnSelectMode" hidden>
+          <svg viewBox="0 0 24 24" class="ic"><circle cx="18" cy="5" r="2.6" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="6" cy="12" r="2.6" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="18" cy="19" r="2.6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8.3 10.7l7.4-4.4M8.3 13.3l7.4 4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          เลือก
+        </button>
+        <span class="count" id="manhwaCount">0 เรื่อง</span>
+      </div>
     </div>
+    <section class="today" id="todaySection" hidden>
+      <div class="today-head">
+        <h3><span class="kr-mini">오늘</span> ลิสต์วันนี้</h3>
+        <small id="todayDate"></small>
+      </div>
+      <div class="today-row" id="todayRow"></div>
+    </section>
     <div class="grid" id="manhwaGrid"></div>
     <div class="empty" id="manhwaEmpty">
       <div class="empty-kr">텅 비었어요</div>
@@ -139,6 +152,10 @@
         <span class="more-ic"><svg viewBox="0 0 24 24"><path d="M12 21V9m0 0l-4 4m4-4l4 4M4 5h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg></span>
         <div><b>กู้คืนข้อมูล (Import JSON)</b><small>โหลดไฟล์ backup กลับมา</small></div>
       </button>
+      <button class="more-item" data-action="receive">
+        <span class="more-ic"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg></span>
+        <div><b>รับจาก URL (Receive from URL)</b><small>วางลิงก์แชร์ที่เพื่อนส่งมา เพื่อดูตัวอย่างก่อนรับ</small></div>
+      </button>
     </div>
   </section>
 
@@ -167,6 +184,22 @@
     <span>อื่นๆ</span>
   </button>
 </nav>
+
+<!-- ============ Selection bar (share) ============ -->
+<div class="select-bar" id="selectBar" hidden>
+  <div class="inner">
+    <span class="sel-count" id="selCount">เลือก 0</span>
+    <button class="btn-ghost sm" id="selAll">ทั้งหมด</button>
+    <button class="btn-ghost sm" id="selCancel">ยกเลิก</button>
+    <button class="btn-danger-icon" id="selDelete" aria-label="ลบที่เลือก" disabled>
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    </button>
+    <button class="btn-primary sm" id="selShare" disabled>
+      <svg viewBox="0 0 24 24" class="ic"><circle cx="18" cy="5" r="2.6" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="6" cy="12" r="2.6" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="18" cy="19" r="2.6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8.3 10.7l7.4-4.4M8.3 13.3l7.4 4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      แชร์
+    </button>
+  </div>
+</div>
 
 <!-- ============ Modal ============ -->
 <div class="modal-backdrop" id="modal" hidden>
