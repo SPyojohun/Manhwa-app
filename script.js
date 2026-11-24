@@ -570,6 +570,7 @@ document.querySelectorAll('.more-item').forEach(it=>{
     else if(a==='export') exportData();
     else if(a==='import') $('#importFile').click();
     else if(a==='receive') openReceiveModal();
+    else if(a==='update') forceUpdate();
     else if(a==='install') triggerInstall();
   });
 });
@@ -815,7 +816,7 @@ function setSelectMode(on){
 }
 function updateSelectBar(){
   const n = selectedIds.size;
-  $('#selCount').textContent = 'เลือก ' + n;
+  $('#selCount').innerHTML = '<span class="lbl">เลือก </span>' + n;
   $('#selShare').disabled = n === 0;
   $('#selDelete').disabled = n === 0;
   $('#selAll').textContent = (n === state.manhwa.length && n > 0) ? 'ล้าง' : 'ทั้งหมด';
@@ -1026,7 +1027,7 @@ async function showReceive(code, fromHash){
     $('#rv_accept').textContent = n ? `ยอมรับ (${n})` : 'ยอมรับ';
     $('#rv_accept').disabled = n === 0;
     $('#rv_all').textContent = n === items.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด';
-    boxes.forEach(b=> b.closest('.recv-row').classList.toggle('off', !b.checked));
+    boxes.forEach(b=>{ const r=b.closest('.recv-row'); r.classList.toggle('off', !b.checked); r.classList.toggle('on', b.checked); });
   }
   boxes.forEach(b=> b.addEventListener('change', refresh));
   $('#rv_all').addEventListener('click', ()=>{
@@ -1087,12 +1088,50 @@ function openReceiveModal(){
 }
 
 /* -------------------- PWA service worker -------------------- */
+const APP_VERSION = '3';   // keep in step with CACHE in sw.js (manhwa-v3)
+$('#appVersion').textContent = 'เวอร์ชัน ' + APP_VERSION + ' · แตะเพื่อดึงเวอร์ชันล่าสุด';
+
 if('serviceWorker' in navigator){
   // only register on real (not iframe) contexts
   const isInIframe = (()=>{ try{ return window.self!==window.top; }catch(_){ return true; }})();
   if(!isInIframe){
-    window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
+    window.addEventListener('load', async ()=>{
+      try{
+        const hadController = !!navigator.serviceWorker.controller;
+        // updateViaCache:'none' -> the browser never trusts GitHub Pages' cached copy of sw.js
+        const reg = await navigator.serviceWorker.register('sw.js', {updateViaCache:'none'});
+        reg.update().catch(()=>{});
+        // PWAs stay alive in the background: re-check whenever the app comes back to the foreground
+        document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) reg.update().catch(()=>{}); });
+        // a new service worker took over -> reload once so the new code actually runs
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+          if(!hadController || reloaded) return;          // first install: nothing to refresh
+          if(!$('#modal').hidden){ toast('มีเวอร์ชันใหม่ — ปิดแล้วเปิดแอปใหม่เพื่ออัปเดต'); return; }  // don't wipe a form mid-edit
+          reloaded = true; location.reload();
+        });
+      }catch(_){}
+    });
   }
+}
+
+/* manual "pull the latest version" — clears app caches only; your library (IndexedDB) is untouched */
+async function forceUpdate(){
+  toast('กำลังอัปเดต...');
+  try{
+    if('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=> r.unregister()));
+    }
+    if(window.caches){
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k=> caches.delete(k)));
+    }
+    // refresh the browser's HTTP cache too (GitHub Pages sends max-age=600)
+    await Promise.all(['./','index.html','style.css','script.js','manifest.json','sw.js']
+      .map(u=> fetch(u, {cache:'reload'}).catch(()=>{})));
+  }catch(_){}
+  location.reload();
 }
 
 
