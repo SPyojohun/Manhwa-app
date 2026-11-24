@@ -495,7 +495,7 @@ body.selecting .toast{bottom:calc(var(--nav-h) + 84px);}
 .recv-row{cursor:pointer;transition:box-shadow .15s,background .15s;}
 .recv-row input{width:20px;height:20px;accent-color:var(--pink-500);flex-shrink:0;}
 .recv-row.off{opacity:.6;}
-.recv-row:has(input:checked){box-shadow:0 0 0 2px var(--pink-400);background:#fff;}
+.recv-row.on{box-shadow:0 0 0 2px var(--pink-400);background:#fff;}
 .recv-row .host{color:var(--pink-700);}
 .recv-row .rdesc{
   font-size:12px;color:var(--ink-soft);margin-top:2px;
@@ -550,3 +550,85 @@ body.selecting .toast{bottom:calc(var(--nav-h) + 84px);}
 }
 .today-img{display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,var(--pink-200),var(--pink-300));}
 .today-img > span{font-size:22px;color:rgba(255,255,255,.9);}
+
+/* =============== Scale fixes (tiny phones, landscape, tall/short screens) =============== */
+/* modal: dynamic viewport height (mobile browser bars) + action buttons always reachable */
+.modal{max-height:90vh;max-height:90dvh;overscroll-behavior:contain;}
+.modal-actions{
+  position:sticky;bottom:0;z-index:3;
+  margin-top:12px;padding:12px 0 2px;
+  background:linear-gradient(to top,#fff 78%,rgba(255,255,255,0));
+  flex-wrap:wrap;
+}
+.recv-list{max-height:min(48vh,420px);max-height:min(48dvh,420px);}
+.check-list{max-height:min(300px,40vh);max-height:min(300px,40dvh);}
+
+/* selection bar: always fits on one line */
+.select-bar .inner{flex-wrap:nowrap;}
+@media(max-width:340px){
+  .select-bar{padding:0 8px;}
+  .select-bar .inner{gap:4px;padding:6px 6px 6px 10px;}
+  .select-bar .lbl{display:none;}
+  .select-bar .btn-ghost.sm{padding:8px 9px;font-size:12px;}
+  .select-bar .btn-primary.sm{padding:8px 11px;}
+  .sel-count{font-size:14px;min-width:14px;text-align:center;}
+}
+/* very small phones */
+@media(max-width:340px){
+  .page-header{flex-wrap:wrap;}
+  .page[data-page="manhwa"] .page-header h2{font-size:17px;}
+  .today{padding:12px 8px 10px;}
+  .today-row{gap:6px;}
+  .today-card > span{font-size:10px;}
+  .modal{padding:16px;}
+}
+/* short landscape screens: keep modals compact, grid denser */
+@media(max-height:480px){
+  .modal{max-height:94vh;max-height:94dvh;padding:14px 18px;}
+  .modal-head{margin-bottom:10px;}
+  .recv-list{max-height:min(38vh,200px);max-height:min(38dvh,200px);}
+}
+/* large screens: keep Today's list a sensible size */
+@media(min-width:700px){
+  .today{max-width:720px;}
+  .today-row{gap:14px;}
+  .today-card > span{font-size:12.5px;}
+}
+/* Today's list header never wraps the badge/title; date drops below when tight */
+.today-head{flex-wrap:wrap;row-gap:2px;}
+.today-head h3{white-space:nowrap;}
+.today-head .kr-mini{white-space:nowrap;}
+
+/* =============== Pinned (favourites) =============== */
+.pin-btn{
+  position:absolute;top:8px;right:8px;z-index:2;
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(255,255,255,.92);color:var(--pink-700);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px rgba(255,111,150,.25);
+  transition:background .15s,color .15s,transform .15s;
+}
+.pin-btn svg{width:17px;height:17px;fill:none;}
+.pin-btn:active{transform:scale(.88);}
+.pin-btn.on{background:var(--pink-500);color:#fff;}
+.pin-btn.on svg{fill:currentColor;}
+.grid.selecting .pin-btn{display:none;}
+.card.heroine .pin-btn{display:none;}
+
+.today.pinned{background:linear-gradient(160deg,#fff 0%,#fff4e8 100%);border-color:#ffe2c2;}
+.pinned .today-head h3{color:#c2410c;}
+.pinned .today-head .kr-mini{background:#ffe9d1;color:#c2410c;}
+.pinned-row{
+  display:grid;grid-auto-flow:column;grid-auto-columns:clamp(84px,24vw,140px);gap:8px;
+  overflow-x:auto;scroll-snap-type:x proximity;
+  -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
+  padding:2px 2px 8px;margin:0 -2px;scrollbar-width:thin;
+}
+.pinned-row::-webkit-scrollbar{height:4px;}
+.pinned-row::-webkit-scrollbar-thumb{background:#ffd3a8;border-radius:4px;}
+.pin-item{position:relative;scroll-snap-align:start;min-width:0;}
+.pin-item .pin-btn{top:6px;right:6px;width:28px;height:28px;}
+.pin-item .pin-btn svg{width:15px;height:15px;}
+.pinned-empty{font-size:12.5px;color:var(--ink-soft);line-height:1.5;padding:4px 2px 2px;}
+@media(max-width:340px){.pin-item .pin-btn{width:26px;height:26px;}}
+.pin-item .today-card{width:100%;}

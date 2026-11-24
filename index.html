@@ -69,6 +69,14 @@
       </div>
       <div class="today-row" id="todayRow"></div>
     </section>
+    <section class="today pinned" id="pinnedSection" hidden>
+      <div class="today-head">
+        <h3><span class="kr-mini">즐겨찾기</span> ปักหมุด</h3>
+        <small id="pinnedCount"></small>
+      </div>
+      <div class="pinned-row" id="pinnedRow"></div>
+      <p class="pinned-empty" id="pinnedEmpty" hidden>แตะไอคอนหมุดบนการ์ดมังฮวา เพื่อปักหมุดเรื่องโปรดไว้ตรงนี้</p>
+    </section>
     <div class="grid" id="manhwaGrid"></div>
     <div class="empty" id="manhwaEmpty">
       <div class="empty-kr">텅 비었어요</div>
@@ -156,6 +164,10 @@
         <span class="more-ic"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg></span>
         <div><b>รับจาก URL (Receive from URL)</b><small>วางลิงก์แชร์ที่เพื่อนส่งมา เพื่อดูตัวอย่างก่อนรับ</small></div>
       </button>
+      <button class="more-item" data-action="update">
+        <span class="more-ic"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.5-5.8M20 4v5h-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></span>
+        <div><b>ตรวจสอบอัปเดต / รีเฟรชแอป</b><small id="appVersion">เวอร์ชัน -</small></div>
+      </button>
     </div>
   </section>
 
@@ -188,15 +200,15 @@
 <!-- ============ Selection bar (share) ============ -->
 <div class="select-bar" id="selectBar" hidden>
   <div class="inner">
-    <span class="sel-count" id="selCount">เลือก 0</span>
+    <span class="sel-count" id="selCount"><span class="lbl">เลือก </span>0</span>
     <button class="btn-ghost sm" id="selAll">ทั้งหมด</button>
     <button class="btn-ghost sm" id="selCancel">ยกเลิก</button>
     <button class="btn-danger-icon" id="selDelete" aria-label="ลบที่เลือก" disabled>
       <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/></svg>
     </button>
-    <button class="btn-primary sm" id="selShare" disabled>
+    <button class="btn-primary sm" id="selShare" aria-label="แชร์ที่เลือก" disabled>
       <svg viewBox="0 0 24 24" class="ic"><circle cx="18" cy="5" r="2.6" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="6" cy="12" r="2.6" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="18" cy="19" r="2.6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8.3 10.7l7.4-4.4M8.3 13.3l7.4 4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      แชร์
+      <span class="lbl">แชร์</span>
     </button>
   </div>
 </div>
